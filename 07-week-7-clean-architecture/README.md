@@ -1,5 +1,5 @@
 # Laporan Praktikum Pemrograman Mobile
-## #06 | Authentication Security & Firebase Cloud Messaging (FCM)
+## #07 | Refactoring Proyek - Feature-First Clean Architecture
 
 * **Nama Mahasiswa:** Adi Luhung
 * **NIM:** 244107020088
@@ -7,84 +7,57 @@
 
 ---
 
-## Fitur Utama Aplikasi
-Aplikasi **Campus Notify App** menerapkan arsitektur autentikasi mobile yang aman berstandar industri dikombinasikan dengan sistem pengiriman pesan berbasis awan (Cloud Messaging):
-* **Secure Storage Session:** Penyimpanan `access_token` dan `refresh_token` disimpan secara eksklusif menggunakan entri terenkripsi `flutter_secure_storage` (Keystore/Keychain), menghindari kerentanan kebocoran data.
-* **Auto-Refresh Sesi Interceptor:** Memanfaatkan pustaka `Dio` untuk menangkap galat `401 Unauthorized` secara asinkron di layer jaringan, menyegarkan token via repositori, dan mengulangi request yang gagal tanpa interupsi pada layer antarmuka.
-* **Manajemen Siklus Hidup Token FCM:** Mengimplementasikan fungsi pelacakan token gawai secara aktif via `onTokenRefresh` untuk menjamin data token registrasi di database server tidak basi.
-* **Deep Link Navigation Per rute:** Memanfaatkan kombinasi `GoRouter` dan `flutter_local_notifications` untuk memproses gabungan payload `notification` + `data` secara instan menuju rute dinamis `/pengumuman/:id` pada tiga kondisi *app state*.
+## 1. Justifikasi Arsitektur & Analisis Trade-Off (AI Challenge)
+
+Pada praktikum minggu ke-7 ini, struktur kode proyek minggu sebelumnya yang berbentuk `layer-first` direfaktor secara menyeluruh menjadi pola arsitektur **`feature-first Clean Architecture`** dengan pembagian modular per komponen fitur (`announcements` dan `auth`).
+
+### Matriks Pertimbangan Keputusan Desain (Trade-Off):
+* **Penerapan Use Case Tunggal:** Desain use case `GetAnnouncements` dibuat secara khusus untuk memisahkan satu alur bisnis utama. Desain ini menghindari penumpukan logika bisnis di dalam satu berkas tunggal yang dapat melanggar *Single Responsibility Principle*.
+* **Pemisahan Entity vs Model:** Objek bisnis murni diisolasi ke dalam berkas `announcement.dart` tanpa melibatkan kode konversi platform apa pun. Proses pemetaan manipulasi data masukan dari dunia luar dikunci rapat hanya di dalam `announcement_model.dart` pada layer data.
+* **Biaya Over-Engineering:** Untuk operasi CRUD satu baris yang sangat sederhana, penulisan pola berlapis ini memang tergolong *over-engineering* karena menambah jumlah berkas baru yang signifikan. Namun, langkah taktis ini bernilai sepadan demi menjaga kebersihan dependensi jangka panjang, kemudahan isolasi testing, serta kebebasan UI dari keterikatan terhadap database lokal maupun jaringan API luar.
 
 ---
 
-## Dokumentasi Screenshot & Penjelasan Fitur
+## 2. Dokumentasi Screenshot Bukti Praktikum
 
-### 1. Bukti Tampilan Banner Notifikasi Terbuka (State Foreground)
-<img src="screenshots/1_foreground_banner.jpeg" width="280">
+### A. Tampilan Antarmuka Halaman Pengumuman Berbasis Clean Architecture
+<img src="screenshots/1_clean_architecture_ui.jpeg" width="280">
 
-* **Penjelasan Gambaran Anda:** Diambil saat aplikasi sedang terbuka aktif di layar depan gawai. Ketika Firebase menerima payload dari konsol, sistem tidak memicu banner otomatis gawai. Fungsi `listenForeground` berhasil menangkap objek `RemoteMessage` dan memicu pembuatan banner lokal secara manual memanfaatkan pustaka `flutter_local_notifications`.
+* **Penjelasan:** Menampilkan halaman beranda aplikasi yang berhasil memuat data kartu pengumuman secara dinamis. Layer presentation (UI) benar-benar steril dan hanya membaca state dari provider tanpa terkontaminasi detail SQL, Dio, maupun parsing data mentah.
 
----
+### B. Hasil Validasi Analisis Statis (Flutter Analyze)
+<img src="screenshots/2_static_analysis_passed.png" width="520">
 
-### 2. Tampilan Banner Sistem Otomatis (State Background)
-<img src="screenshots/2_background_system_banner.jpeg" width="280">
+* **Penjelasan:** Bukti eksekusi perintah analisis kode di terminal gawai. Proyek berstatus bersih total tanpa adanya *warning lint*, *typo*, maupun kesalahan aturan arsitektur.
 
-* **Penjelasan Gambaran Anda:** Diambil ketika aplikasi berada dalam kondisi di-*minimize* (kondisi latar belakang). Pengiriman pesan dengan tipe payload gabungan berhasil memicu subsistem OS gawai untuk menampilkan banner notifikasi standar bawaan pabrik secara otomatis.
+### C. Hasil Eksekusi Unit Test Lulus (All Tests Passed)
+<img src="screenshots/3_unit_test_passed.png" width="520">
 
----
-
-### 3. Tampilan Sukses Deep Linking Rute Dinamis (Klik Notifikasi)
-<img src="screenshots/3_deeplink_target.jpeg" width="280">
-
-* **Penjelasan Gambaran Anda:** Diambil sesaat setelah banner notifikasi diketuk oleh pengguna. Fungsi `setupNotificationClicks` berhasil menangkap parameter rute di dalam payload `data['route']` dan memerintahkan `GoRouter` melakukan interupsi navigasi langsung melompat ke halaman detail pengumuman `/pengumuman/id` secara utuh.
+* **Penjelasan:** Pengujian use case memanfaatkan *Fake Object Repository* berhasil lolos 100% tanpa membutuhkan koneksi database atau Firebase sungguhan, membuktikan isolasi logika bisnis di layer domain berjalan sempurna.
 
 ---
 
-### 4. Pembuktian Validasi Sisi Keamanan Token (Halaman Dashboard)
-<img src="screenshots/4_debug_token.jpeg" width="280">
+## 3. Hasil Validasi Sterilitas Layer (Grep Rule Verification)
 
-* **Penjelasan Gambaran Anda:** Tampilan panel Debug informasi pada beranda aplikasi yang memuat token registrasi FCM gawai. Sesuai dengan batasan regulasi keamanan modul praktikum, token gawai ditampilkan secara terpotong (hanya 12 karakter pertama saja) demi mencegah eksploitasi data privasi token penuh pada laporan berkas.
+Sesuai dengan *AI Verification Checklist* di halaman 6 modul, dilakukan pengujian sterilitas kode di layer domain dan presentation menggunakan perintah pencarian string terminal secara manual:
 
----
-
-### 5. Hasil Pengujian Statis & Unit Pengujian Lulus (Passed)
-<img src="screenshots/5_test_passed.png" width="550">
-
-* **Penjelasan Gambaran Anda:** Bukti fisik dari terminal laptop setelah menjalankan perintah verifikasi proyek secara menyeluruh. Hasil eksekusi `flutter analyze` berstatus bersih total (*No issues found*) dan unit pengujian asinkron simulasi sesi serta perutean data notifikasi lolos pengujian secara otomatis dengan status **All tests passed**.
-
----
-
-## Hasil Refactoring Challenge
-* **Sentralisasi Penjaga Rute Guard:** Konfigurasi filter `redirect` diletakkan terpusat pada file `lib/main.dart` memanfaatkan objek notifier `authStateProvider` untuk mendepak pengguna tak dikenal secara paksa kembali ke `/login`.
-* **Modularisasi Manajemen State:** Seluruh pendaftaran komponen provider global (`tokenStoreProvider`, `apiClientProvider`, `authStateProvider`) dipisahkan keluar dari fungsi utama masuk ke dalam berkas terisolasi `lib/providers/auth_provider.dart` demi menjaga kebersihan kode.
-* **Pembersihan Lint Parameter:** Mengeliminasi seluruh peringatan *warning lint* oranye pada argumen perutean dengan menyesuaikan parameter berpasangan `(context, state)` yang valid pada penulisan struktur `GoRoute`.
+* **Perintah Uji 1 (Sterilitas Presentation dari Data Mentah):**
+  `rg "Dio\(|openDatabase|getDatabasesPath|FlutterSecureStorage|SharedPreferences\.getInstance" lib/features/announcements/presentation/`
+  *Hasil:* **NOL TEMUAN (BERSIH)**. Tidak ada kebocoran instruksi layer data langsung ke antarmuka layar widget.
+  
+* **Perintah Uji 2 (Sterilitas Domain dari Pustaka Framework):**
+  `rg "import 'package:flutter/|import 'package:dio/|import 'package:sqflite/" lib/features/announcements/domain/`
+  *Hasil:* **NOL TEMUAN (BERSIH)**. Layer logika bisnis murni bersih total dari keterikatan framework eksternal.
 
 ---
 
-## AI Prompt Challenge & Perbandingan Pola Login
+## 4. Jawaban Berkas Refleksi Modul Halaman 8
 
-**Teks Prompt Eksperimen yang Digunakan:**
-> *"Aplikasi Flutter Campus Notification App. Stack: firebase_messaging, flutter_local_notifications, flutter_secure_storage, go_router, Riverpod. Buatkan PushService dengan requestPermission + getToken + onTokenRefresh..."*
-
-### Tabel Analisis Perbandingan Pola Autentikasi Industri:
-
-| Fitur Utama | Firebase Auth (Email/Google) | JWT Refresh Token (Custom API) | OAuth (Google SSO) |
-| :--- | :--- | :--- | :--- |
-| **Kebutuhan Server** | Tanpa membangun server auth sendiri | Membutuhkan Backend Sendiri | Mengandalkan OAuth Provider |
-| **Keamanan Token** | Dikelola penuh oleh SDK Firebase | Menggunakan pasangan Access + Refresh Token | Menggunakan authorization code exchange |
-| **Karakteristik** | Sangat Instan & Praktis | Sangat Fleksibel & Terkontrol | Standar Login Sosial Terpusat |
-| **Kasus Penggunaan** | Aplikasi kampus/umkm skala cepat | Backend kampus milik internal sendiri | Single Sign-On (SSO) Akun Kampus |
-
----
-
-## Jawaban Refleksi Laporan Modul
-
-* **Mengapa refresh token tidak boleh disimpan di SharedPreferences? Apa risikonya bila bocor?**
-  `SharedPreferences` menaruh berkas datanya dalam format XML biasa tanpa proteksi enkripsi internal di media penyimpanan lokal gawai. Jika gawai terinfeksi malware, token berumur panjang ini dapat dibaca dengan mudah. Kebocoran `refresh_token` sangat fatal karena peretas bisa menggunakannya untuk terus menerbitkan `access_token` baru tanpa batasan waktu untuk membajak identitas korbannya. Oleh karena itu, token harus diamankan di `flutter_secure_storage`.
-
-* **Apa yang rusak bila onTokenRefresh diabaikan selama satu semester perkuliahan?**
-  Token FCM dari Firebase sewaktu-waktu dapat berganti secara otomatis akibat gawai melakukan instalasi ulang, kloning sistem, atau *clear data*. Jika fungsi `onTokenRefresh` diabaikan, server backend kampus akan terus memegang token lama yang sudah hangus/basi. Dampaknya, mahasiswa tersebut tidak akan pernah bisa menerima dorongan pengumuman kelas perkuliahan lagi di gawainya selama satu semester penuh.
-
-* **Kapan memakai topik dan kapan memakai token perangkat? Beri contoh pesan kampus untuk masing-masing.**
-  Strategi topik digunakan untuk pola penyebaran informasi masal searah (*broadcast*) tanpa membutuhkan validasi identitas personal. Sebaliknya, token perangkat wajib digunakan untuk lalu lintas informasi privat rahasia yang terikat khusus ke satu entitas user.
-  * **Contoh Topik (`pengumuman-kampus`):** *"Informasi: Seluruh aktivitas perkuliahan dialihkan ke daring esok hari karena agenda wisuda."*
-  * **Contoh Token Perangkat:** *"Notifikasi Keuangan: Tagihan UKT Semester Ganjil milik NIM 244107020088 terverifikasi Lunas."*
+* **Mengapa interface repository harus tinggal di domain, bukan di data? Apa yang rusak bila dibalik?**
+  *Jawaban:* Berdasarkan prinsip *Dependency Inversion*, core logika bisnis (domain) tidak boleh bergantung pada detail infrastruktur teknis (data). Dengan menaruh *interface* di layer domain, kita menegaskan bahwa layer domain yang memegang kendali kontrak aturan main data apa saja yang dibutuhkan aplikasi. Jika posisi dibalik, arah panah dependensi akan menunjuk ke luar menuju data, sehingga ketika terjadi penggantian sistem database (misal dari SQLite ke Hive), kode bisnis internal akan ikut rusak dan wajib ditulis ulang.
+  
+* **Kapan use case benar-benar dibutuhkan, dan kapan repository langsung ke notifier sudah cukup?**
+  *Jawaban:* *Use Case* mutlak dibutuhkan ketika sebuah operasi aplikasi mengandalkan penggabungan data lebih dari satu repositori yang berbeda, membutuhkan fungsi validasi bisnis yang ketat, atau memiliki algoritma penyaringan data yang kompleks. Sebaliknya, jika operasi aplikasi hanya berupa jembatan satu baris ambil data mentah tanpa manipulasi (*CRUD passthrough*), pemanggilan repositori langsung dari kelas Notifier state sudah dinilai cukup memadai untuk mempercepat kinerja pembangunan.
+  
+* **Apa biaya over-engineering (use case per CRUD satu-baris) bagi tim kecil? Kapan biayanya sepadan?**
+  *Jawaban:* Biaya terbesarnya (*cost*) bagi tim kecil adalah melambatnya kecepatan peluncuran fitur karena setiap penambahan satu aksi kecil wajib membuat 4-5 berkas baru yang berbeda. Namun, biaya ini akan terasa sepadan ketika aplikasi mulai tumbuh membesar, melibatkan banyak pengembang baru, atau ketika unit pengujian otomatis (*automated testing*) menjadi syarat mutlak kualitas rilis aplikasi.
