@@ -1,0 +1,24 @@
+name: ci
+
+on: [pull_request]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Install dependencies
+        working-directory: ./08-week-8-mid-project-review
+        run: flutter pub get
+      - name: Verify code formatting
+        working-directory: ./08-week-8-mid-project-review
+        run: dart format --set-exit-if-changed .
+      - name: Analyze code
+        working-directory: ./08-week-8-mid-project-review
+        run: flutter analyze
+      - name: Run tests
+        working-directory: ./08-week-8-mid-project-review
+        run: flutter test
